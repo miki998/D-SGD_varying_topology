@@ -101,13 +101,14 @@ def subopt(nodedata, nodemodel, loss_fn):
     return total_loss / total, correct / total    
 
 
-def computeDecentralize(nodesData, topology, K, max_epoch=10, validation=None):
+def computeDecentralize(nodesData, topology, K, device='cpu', max_epoch=10, validation=None):
     """
     desc: compute a full training of D-SGD while logging on train set (and possibly validation set)
     args: 
         - nodesData ::[list(tuple<<array>,<array>>)](pairs of images and labels for each nodes)
         - topology  ::[Topology](topology class object used for its mixing matrix)
         - K         ::[int] (number of nodes)
+        - device    ::[str] ('cpu'/'cuda:{idx}')
         - max_epoch ::[int]
         - validation::[tuple<<array>,<array>>](images and labels belonging to validation set, we give the same validation set\
         to all nodes when evaluating)
@@ -116,9 +117,10 @@ def computeDecentralize(nodesData, topology, K, max_epoch=10, validation=None):
         - resultdfVal  ::[dataframe](logging validation accuracies and losses for all nodes and epochs)
         - cDists       ::[list](list of consensus distances for each epochs)
         - models       ::[CNN](models and its updated weights, used for test set prediction)
-    """
+    """    
     graph = topology.to_networkx()
     W = nx.adjacency_matrix(graph)
+    # topology.draw_graph()
 
     W = mixing_matrix(graph, loop=False)
 
@@ -129,7 +131,7 @@ def computeDecentralize(nodesData, topology, K, max_epoch=10, validation=None):
     losses     = []
 
     for i in range(K):
-        model     = CNN()
+        model     = CNN().to(device)
         optimizer = optim.SGD(model.parameters(), lr=0.0005, momentum=0.9)
         loss_fn   = nn.CrossEntropyLoss()
 
@@ -145,7 +147,8 @@ def computeDecentralize(nodesData, topology, K, max_epoch=10, validation=None):
         # we train separately the nodes with their respective data 
         # we update implicitely models and optimizers
         for node_idx in graph.nodes():
-            train(nodesData[node_idx], models[node_idx], optimizers[node_idx], losses[node_idx], epoch, verbose=False)
+
+            train(nodesData[node_idx], models[node_idx], optimizers[node_idx], losses[node_idx], epoch, device, verbose=False)
 
         # we share the parameters weights among the neighbours
         for node_idx in graph.nodes():
@@ -160,27 +163,30 @@ def computeDecentralize(nodesData, topology, K, max_epoch=10, validation=None):
 
             for p in neighbors:
                 p_params = getParams(models[p])
-                tmp      = prod(p_params, W[node_idx, p])
-                ret      = addition(ret, tmp)
+                tmp = prod(p_params, W[node_idx, p])
+                ret = addition(ret, tmp)
 
-            # copying the oarameters to inplace operation for each nodes
+            # copying the parameters to inplace operation for each nodes
             with torch.no_grad():
                 for idx, param in enumerate(models[node_idx].parameters()):
                     param.copy_(ret[idx])
 
 
-            loss, acc   = subopt(nodesData[node_idx], models[node_idx], loss_fn)
+            loss, acc   = subopt(nodesData[node_idx], models[node_idx], loss_fn, device)
             curTrainDir = {'Epoch': epoch + 1, 'loss': loss, 'acc': acc}
             train_stats[str(node_idx)].append(curTrainDir)
             
             if not validation is None:
-                lossVal, accVal = subopt(validation, models[node_idx], loss_fn)
+                lossVal, accVal = subopt(validation, models[node_idx], loss_fn, device)
                 curValDir       = {'Epoch': epoch + 1, 'loss': lossVal, 'acc': accVal}
                 val_stats[str(node_idx)].append(curValDir)                
 
         cDist  = consensusDistance(models)
         cDists.append(cDist)
     
-    resultdfTrain   = getLogs(train_stats)
-    resultdfVal     = getLogs(val_stats)
+    resultdfTrain = getLogs(train_stats)
+    resultdfVal   = None
+    if not validation is None:
+        resultdfVal = getLogs(val_stats)
+
     return resultdfTrain, resultdfVal, cDists, models
