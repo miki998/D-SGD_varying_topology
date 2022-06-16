@@ -57,12 +57,61 @@ class SocialNetworkTopology(Topology):
     def get_neighbors(self, worker):
         return(list(self.graph.neighbors(worker)))
 
-class TorusTopology(Topology):
+class WheelTopology(Topology):
     def __init__(self, n_workers):
         super().__init__(n_workers)
-        torus = nx.generators.lattice.grid_2d_graph(int(np.sqrt(self.n_workers)), int(np.sqrt(self.n_workers)), periodic=True)
-        self.graph = nx.relabel.convert_node_labels_to_integers(torus)
+
+        wheel = nx.wheel_graph(n=n_workers)
+        self.graph = nx.relabel.convert_node_labels_to_integers(wheel)
         self.n_workers = len(self.graph.nodes)
+
+    def to_networkx(self):
+        return self.graph
+
+    def get_neighbors(self, worker):
+        return(list(self.graph.neighbors(worker)))
+
+class LadderTopology(Topology):
+    def __init__(self, n_workers):
+        super().__init__(n_workers)
+
+        ladder = nx.ladder_graph(n=n_workers//2)
+        self.graph = nx.relabel.convert_node_labels_to_integers(ladder)
+        self.n_workers = len(self.graph.nodes)
+
+    def to_networkx(self):
+        return self.graph
+
+    def get_neighbors(self, worker):
+        return(list(self.graph.neighbors(worker)))
+
+class BarbellTopology(Topology):
+    def __init__(self, n_workers):
+        super().__init__(n_workers)
+        
+        path_lenth = n_workers - (2*(n_workers // 2))
+        barbell = nx.barbell_graph(m1=(n_workers // 2), m2=path_lenth)
+        self.graph = nx.relabel.convert_node_labels_to_integers(barbell)
+        self.n_workers = len(self.graph.nodes)
+
+    def to_networkx(self):
+        return self.graph
+
+    def get_neighbors(self, worker):
+        return(list(self.graph.neighbors(worker)))
+
+class TorusTopology(Topology):
+    def __init__(self, n_workers, dimension='2d'):
+        super().__init__(n_workers)
+
+        if dimension == '2d':
+            torus = nx.generators.lattice.grid_2d_graph(int(np.sqrt(self.n_workers)), int(np.sqrt(self.n_workers)), periodic=True)
+            self.graph = nx.relabel.convert_node_labels_to_integers(torus)
+            self.n_workers = len(self.graph.nodes)
+        elif dimension == '3d':
+            torus = nx.grid_graph(dim=(int(np.cbrt(self.n_workers)), int(np.cbrt(self.n_workers)), int(np.cbrt(self.n_workers))), periodic=True)
+            self.graph = nx.relabel.convert_node_labels_to_integers(torus)
+            self.n_workers = len(self.graph.nodes)          
 
     def to_networkx(self):
         return self.graph
