@@ -23,7 +23,6 @@ Main Library needed
 torch
 networkx
 matplotlib
-
 ```
 
 ## Getting started
