@@ -1,9 +1,11 @@
 ## Description
 Our code is largely notebook based to show plots and results relayed in the report. 
 Main points are as follows:
+    
     - iid distribution for D-SGD for various topology (part 1)
     - non-iid distribution for D-SGD for various topology (part 2)
     - non-iid distribution for D-SGD for iteratively modified starting topologies (part 3)
+    
 ```
 differrentTopology.ipynb     : notebooks computing plots for part 1 and 2
 Algo1_findTopology.ipynb     : notebooks computing plots for part 3
